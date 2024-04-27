@@ -10,12 +10,18 @@ async fn index() -> HttpResponse {
 }
 
 
-async fn send_image(req: HttpRequest) -> impl Responder {
+async fn send_image(path: web::Path<String> ,req: HttpRequest) -> impl Responder {
+    let img_path = path.into_inner();
+
     let query = req.query_string();
+
+    if img_path == "" {
+        return HttpResponse::BadRequest().body("Invalid path");
+    }
 
     if query == "original" || query == ""{
         // Attempt to serve the original image directly
-        match NamedFile::open("storage/testing.png") {
+        match NamedFile::open("storage/".to_owned() + &img_path) {
             Ok(file) => file.use_last_modified(true).use_etag(true).into_response(&req),
             Err(_) => HttpResponse::BadRequest().body("Error loading image")
         }
@@ -31,7 +37,7 @@ async fn send_image(req: HttpRequest) -> impl Responder {
         }
 
         // Load and process the image
-        let img = match open("storage/testing.png") {
+        let img = match open("storage/".to_owned() + &img_path) {
             Ok(img) => img,
             Err(_) => return HttpResponse::BadRequest().body("Error loading image"),
         };
@@ -53,7 +59,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(|| {
         App::new()
             .route("/", web::get().to(index))
-            .route("/image", web::get().to(send_image))
+            .route("/{image_path}", web::get().to(send_image))
     })
     .bind("0.0.0.0:10800")?
     .run()
